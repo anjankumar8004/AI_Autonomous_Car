@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 7.4.2.3 (Linux)"/>
+	<meta name="created" content="00:00:00"/>
+	<meta name="changed" content="00:00:00"/>
+	<style type="text/css">
+		@page { size: 8.5in 11in; margin: 0.79in }
+		p { line-height: 115%; margin-bottom: 0.1in; background: transparent }
+		pre { font-family: "Liberation Mono", monospace; font-size: 10pt; background: transparent }
+	</style>
+</head>
+<body lang="en-US" link="#000080" vlink="#800000" dir="ltr"><pre>import pickle
+from keras.models import load_model
+from time import sleep
+import numpy as np
+from gpiozero import Motor
+import cv2
+import sys
+import tensorflow as tf
+import keras
+import tty
+import termios
+from picamera2 import Picamera2, Preview
+import RPi.GPIO as GPIO
+import threading
+from datetime import datetime
+
+
+
+motor_front_left = Motor(forward=26, backward=16)  # GPIO pins for the front left motor
+motor_front_right = Motor(forward=5, backward=6)  # GPIO pins for the front right motor
+motor_rear_left = Motor(forward=8, backward=7)  # GPIO pins for the rear left motor
+motor_rear_right = Motor(forward=9, backward=10)  # GPIO pins for the rear right motor
+
+# Functions to control the car's movement
+def move_forward():
+    motor_front_left.forward(0.6)
+    motor_front_right.forward(0.6)
+    motor_rear_left.forward(0.6)
+    motor_rear_right.forward(0.6)
+
+def move_backward():
+    motor_front_left.backward()
+    motor_front_right.backward()
+    motor_rear_left.backward()
+    motor_rear_right.backward()
+
+def turn_left():
+    motor_front_left.backward()
+    motor_front_right.forward()
+    motor_rear_left.backward()
+    motor_rear_right.forward()
+
+def turn_right():
+    motor_front_left.forward()
+    motor_front_right.backward()
+    motor_rear_left.forward()
+    motor_rear_right.backward()
+
+def stop_motors():
+    motor_front_left.stop()
+    motor_front_right.stop()
+    motor_rear_left.stop()
+    motor_rear_right.stop()
+
+def show_camera_preview():
+    picam3 = Picamera2()
+    picam3.start(show_preview=True)
+    sleep(2000)
+
+def cam_click(direction):
+    path=&quot;&quot; 
+    timestamp = datetime.now()
+    formatted_datetime = timestamp.strftime(&quot;%Y_%m_%d_%H_%M_%S&quot;)
+    if (direction==&quot;w&quot;):
+        path=&quot;./TrainData/Forward/Forward_&quot;+formatted_datetime
+    if (direction==&quot;a&quot;):
+        path=&quot;./TrainData/Left/Left_&quot;+formatted_datetime
+    if (direction==&quot;d&quot;):
+        path=&quot;./TrainData/Right/Right_&quot;+formatted_datetime
+    if (direction==&quot;s&quot;):
+        path=&quot;./TrainData/Stop/Stop_&quot;+formatted_datetime
+    
+    for i in range(3):
+        picam = Picamera2()  
+        config = picam.create_preview_configuration()
+        picam.configure(config)
+        picam.start()
+        #picam.start_preview(Preview.QTGL)
+        picam.capture_file(path+str(i)+&quot;.jpg&quot;)
+        sleep(0.1)
+        picam.close()
+
+model = load_model(&quot;model_AI_Car.h5&quot;)
+model.load_weights(&quot;./model_AI_Car_Weights.h5&quot;)
+
+dict_file = open(&quot;./ai_car.pkl&quot;, &quot;rb&quot;)
+category_dict = pickle.load(dict_file)
+
+
+try:
+    while (1):
+        #Read image from camera
+
+        #im = np.array(image, dtype=np.uint8)
+        picam = Picamera2()  
+        config = picam.create_preview_configuration()
+        picam.configure(config)
+        picam.start()
+        sleep(0.1)
+        np_array = picam.capture_array()
+        sleep(0.3)
+        picam.close()
+
+        im = np_array
+        # im = cv2.flip(im, 0)
+        # 
+
+
+        #rotation angle in degree
+        # im = np.rot90(im, k=1)
+        # im = cv2.flip(im, 1)
+        im = cv2.resize(im, (512, 512))
+        im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+
+
+        test_img = cv2.resize(im, (50, 50))
+        test_img = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
+        test_img = test_img/255
+        test_img = test_img.reshape(1, 50, 50, 1)
+
+        results = model.predict(test_img)
+        label = np.argmax(results, axis=1)[0]
+        acc = int(np.max(results, axis=1)[0]*100)
+
+        print(f&quot;Moving : {category_dict[label]} with {acc}% accuracy.&quot;)
+
+        if (label == 0):
+             thread1 = threading.Thread(target=move_forward)
+             thread1.start()
+             sleep(0.9)
+             stop_motors()
+        elif (label == 1):
+            thread1 = threading.Thread(target=turn_left)
+            thread1.start()
+            sleep(0.4)
+            stop_motors()
+        elif (label == 2):
+            thread1 = threading.Thread(target=turn_right)
+            thread1.start()
+            sleep(0.4)
+            stop_motors() 
+        else:
+            stop_motors() 
+        label = -1
+
+        cv2.imshow(&quot;data&quot;, im)
+        com = cv2.waitKey(1)
+        if (com == ord('q')):
+            lSpeed = 0
+            rSpeed = 0
+            break
+
+    cv2.destroyAllWindows()
+except:
+    cv2.destroyAllWindows()
+
+</pre>
+</body>
+</html>

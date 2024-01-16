@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 7.4.2.3 (Linux)"/>
+	<meta name="created" content="00:00:00"/>
+	<meta name="changed" content="00:00:00"/>
+	<style type="text/css">
+		@page { size: 8.5in 11in; margin: 0.79in }
+		p { line-height: 115%; margin-bottom: 0.1in; background: transparent }
+		pre { font-family: "Liberation Mono", monospace; font-size: 10pt; background: transparent }
+	</style>
+</head>
+<body lang="en-US" link="#000080" vlink="#800000" dir="ltr"><pre>from gpiozero import Motor
+from time import sleep
+import sys
+import tty
+import termios
+from picamera2 import Picamera2, Preview
+import RPi.GPIO as GPIO
+import threading
+from datetime import datetime
+
+motor_front_left = Motor(forward=26, backward=16)  # GPIO pins for the front left motor
+motor_front_right = Motor(forward=5, backward=6)  # GPIO pins for the front right motor
+motor_rear_left = Motor(forward=8, backward=7)  # GPIO pins for the rear left motor
+motor_rear_right = Motor(forward=9, backward=10)  # GPIO pins for the rear right motor
+
+# Functions to control the car's movement
+def move_forward():
+    motor_front_left.forward(0.6)
+    motor_front_right.forward(0.6)
+    motor_rear_left.forward(0.6)
+    motor_rear_right.forward(0.6)
+
+def move_backward():
+    motor_front_left.backward()
+    motor_front_right.backward()
+    motor_rear_left.backward()
+    motor_rear_right.backward()
+
+def turn_left():
+    motor_front_left.backward()
+    motor_front_right.forward()
+    motor_rear_left.backward()
+    motor_rear_right.forward()
+
+def turn_right():
+    motor_front_left.forward()
+    motor_front_right.backward()
+    motor_rear_left.forward()
+    motor_rear_right.backward()
+
+def stop_motors():
+    motor_front_left.stop()
+    motor_front_right.stop()
+    motor_rear_left.stop()
+    motor_rear_right.stop()
+
+def show_camera_preview():
+    picam3 = Picamera2()
+    picam3.start(show_preview=True)
+    sleep(2000)
+
+#Function that helps in collecting the images for training in real time environment.
+def cam_click(direction):
+    path=&quot;&quot; 
+    timestamp = datetime.now()
+    formatted_datetime = timestamp.strftime(&quot;%Y_%m_%d_%H_%M_%S&quot;)
+    if (direction==&quot;w&quot;):
+        path=&quot;./TrainData/Forward/Forward_&quot;+formatted_datetime
+    if (direction==&quot;a&quot;):
+        path=&quot;./TrainData/Left/Left_&quot;+formatted_datetime
+    if (direction==&quot;d&quot;):
+        path=&quot;./TrainData/Right/Right_&quot;+formatted_datetime
+    if (direction==&quot;s&quot;):
+        path=&quot;./TrainData/Stop/Stop_&quot;+formatted_datetime
+    
+    for i in range(1):
+        picam = Picamera2()  
+        config = picam.create_preview_configuration()
+        picam.configure(config)
+        picam.start()
+        sleep(0.2)
+        #picam.start_preview(Preview.QTGL)
+        picam.capture_file(path+str(i)+&quot;.jpg&quot;)
+        sleep(0.1)
+        picam.close()
+
+def get_input():
+    # Save the current terminal settings
+    original_settings = termios.tcgetattr(sys.stdin)
+    #Below lines can be used for remote car control using camera
+    # thread_cam_preview = threading.Thread(target=show_camera_preview)
+    # thread_cam_preview.start()
+    try:
+        # Set the terminal to raw mode
+        tty.setcbreak(sys.stdin.fileno())
+        iter=1
+       
+        while True:
+            # Read a single character
+            char = sys.stdin.read(1)         
+            # Exit loop if Enter is pressed
+
+            #Moving forward operation
+            if char == &quot;w&quot;:  
+                thread1 = threading.Thread(target=move_forward)
+                thread2 = threading.Thread(target=cam_click,args=(&quot;w&quot;))           
+                thread2.start()
+                sleep(0.5)
+                thread2.join()
+                thread1.start()
+                sleep(0.5)
+                stop_motors()
+                iter=iter+1
+                continue
+            #Moving left operation
+            if char == &quot;a&quot;:
+                thread1 = threading.Thread(target=turn_left)
+                thread2 = threading.Thread(target=cam_click,args=(&quot;a&quot;))
+                thread2.start()
+                sleep(0.5)
+                thread2.join()
+                thread1.start()
+                sleep(0.4)
+                stop_motors()
+                iter=iter+1
+                continue
+            #Moving right operation
+            if char == &quot;d&quot;:
+                thread1 = threading.Thread(target=turn_right)
+                thread2 = threading.Thread(target=cam_click,args=(&quot;d&quot;))
+                thread2.start()
+                sleep(0.5)
+                thread2.join()
+                thread1.start()
+                sleep(0.4)
+                stop_motors() 
+                iter=iter+1
+                continue
+            #Stopping 
+            if char == &quot;s&quot;:
+                thread1 = threading.Thread(target=move_backward)
+                thread2 = threading.Thread(target=cam_click,args=(&quot;s&quot;))
+                thread2.start()
+                sleep(1)
+                thread2.join()
+                thread1.start()
+                sleep(0.6)
+                stop_motors()
+                iter=iter+1
+                continue
+            if char == &quot;q&quot;:
+                break
+
+    finally:
+        # Restore the terminal settings
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, original_settings)
+
+# Call the function to get keyboard input
+get_input()
+
+
+</pre>
+</body>
+</html>
