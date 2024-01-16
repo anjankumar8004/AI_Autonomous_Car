@@ -1,1 +1,1 @@
-Please refer docx file for details.
+Please refer pdf or docx file for reference or details.
