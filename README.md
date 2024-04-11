@@ -1,1 +1,1 @@
-Please refer pdf or docx file for reference or details.
+***An AI autonomous car project utilizing Raspberry Pi, a camera, and Convolutional Neural Networks (CNNs) enables real-time image processing for object detection and navigation decisions, facilitating self-driving capabilities within a compact hardware setup. – Python, Raspberry Pi, CNN.Please refer pdf or docx file for reference or details.***
